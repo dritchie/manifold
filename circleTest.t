@@ -29,15 +29,31 @@ end)
 local function circleModule()
 	local radius = 0.4
 	local temp = 0.001
+	local angleWeakenFactor = 1000.0
 	local Vec2 = Vec(real, 2)
 	local ngaussian = macro(function(m, sd) return `gaussian(m, sd, {structural=false}) end)
 	return terra()
-		var circCenter = Vec2d.stackAlloc(0.5, 0.5)
+		
+		-- Prior
+		-- var dotPos = Vec2.stackAlloc(ngaussian(0.5, 0.25), ngaussian(0.5, 0.01))
+		-- var dotPos = Vec2.stackAlloc(ngaussian(0.5, 0.01), ngaussian(0.5, 0.25))
 		var dotPos = Vec2.stackAlloc(ngaussian(0.5, 0.2), ngaussian(0.5, 0.2))
+
+		-- Circle constraint
+		var circCenter = Vec2.stackAlloc(0.5, 0.5)
 		var distToCenter = dotPos:dist(circCenter)
 		var err = distToCenter - radius
 		err = err*err
 		factor(-err/temp)
+
+		-- Angle constraint
+		-- var offset = (dotPos - circCenter)
+		-- offset:normalize()
+		-- var d = offset:dot(Vec2.stackAlloc(0.0, 1.0))
+		-- var derr = 1.0-d
+		-- derr = derr*derr/angleWeakenFactor
+		-- factor(-derr/temp)
+
 		return dotPos
 	end
 end
@@ -55,10 +71,11 @@ local function stripLogprobsAndDiscard(samps,numToDiscard)
 end
 
 local function doLLE(pointSamps)
+	print("Doing LLE...")
 	local inDim = 2
 	local outDim = 1
 	local numPoints = pointSamps.size
-	local k = 10
+	local k = 20
 	local terra dolle()
 		var inData = [&double](C.malloc(numPoints*inDim*sizeof(double)))
 		for i=0,numPoints do
@@ -106,15 +123,15 @@ local function renderVideo(pointSamps)
 	io.write("Rendering video...")
 	io.flush()
 	local imageSize = 100
-	local frameSkip = math.ceil(numsamps / 1000.0)
+	local frameSkip = math.ceil(pointSamps.size / 1000.0)
 	local terra renderFrames()
 		var framename : int8[1024]
 		var framenumber = 0
 		var im = ByteGrid.stackAlloc(imageSize,imageSize)
-		for i=0,numsamps,frameSkip do
+		for i=0,pointSamps.size,frameSkip do
 			C.sprintf(framename, "renders/movie_%06d.png", framenumber)
 			framenumber = framenumber + 1
-			var vecPtr = &pointSamps(i).value
+			var vecPtr = &pointSamps(i)
 			renderDotImage(vecPtr, &im)
 			[ByteGrid.save()](&im, image.Format.PNG, framename)
 		end
@@ -128,8 +145,9 @@ end
 
 ---------------------------------------------
 
-local numsamps = 600
+local numsamps = 1000
 local burnin = 100
+numsamps = numsamps + burnin
 local kernel = HMC({numSteps=10, targetAcceptRate=0.65})
 local terra doInference()
 	return [mcmc(circleModule, kernel, {numsamps=numsamps, verbose=true, burnin=burnin})]
@@ -147,8 +165,8 @@ local struct PointWithEmbedding
 	embedding: double
 }
 local terra comparePoints(p1: &opaque, p2: &opaque)
-	var p1v = [&PointWithEmbedding]p1
-	var p2v = [&PointWithEmbedding]p2
+	var p1v = [&PointWithEmbedding](p1)
+	var p2v = [&PointWithEmbedding](p2)
 	if p1v.embedding < p2v.embedding then
 		return -1
 	elseif p1v.embedding == p2v.embedding then
@@ -160,13 +178,13 @@ end
 local sortedPoints = terralib.new(PointWithEmbedding[embeddedPoints.size])
 for i=0,embeddedPoints.size-1 do
 	local pwe = terralib.new(PointWithEmbedding)
-	pwe.point = points[i]
-	pwe.embedding = embeddedPoints[i]
+	pwe.point = points:get(i)
+	pwe.embedding = embeddedPoints:get(i)
 	sortedPoints[i] = pwe
 end
-C.qsort(sortedPoints, points.size, terralib.sizeof(PointWithEmbedding, comparePoints:getpointer()))
+C.qsort(sortedPoints, points.size, terralib.sizeof(PointWithEmbedding), comparePoints:getpointer())
 for i=0,points.size do
-	points[i] = sortedPoints[i].point
+	points:set(i, sortedPoints[i].point)
 end
 
 renderVideo(points)

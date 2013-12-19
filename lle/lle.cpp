@@ -2,6 +2,7 @@
 #include "stddef.h"
 #include <vector>
 #include <cstdlib>
+#include <iostream>
 
 // Unfortunately, Eigen *still* does not provide sparse eigenvalue solvers...
 //    so we're doing everything dense for now.
@@ -35,13 +36,14 @@ public:
 void computeNeighbors(int k, const vector<VectorXd>& inData, NeighborList& outNeighbors)
 {
 	// For now, just brute force KNN
+
 	outNeighbors.resize(inData.size());
 	vector<NeighborWithDist> neighborDists(inData.size()-1);
 	for (UINT i = 0; i < inData.size(); i++)
 	{
+		int currIndex = 0;
 		for (UINT j = 0; j < inData.size(); j++)
 		{
-			int currIndex = 0;
 			if (i != j)
 			{
 				double distSq = (inData[i] - inData[j]).squaredNorm();
@@ -74,13 +76,15 @@ void computeReconstructionWeights(const vector<VectorXd>& inData, const Neighbor
 		// Have to regularize if num neighbors is greater than the space dimension
 		if (k > dim)
 		{
-			double eps = 1e-3*C.trace();
+			const double scale = 1e-3;
+			// const double scale = 1e-9;
+			double eps = scale*C.trace();
 			C += MatrixXd::Identity(k, k) * eps;
 		}
-		VectorXd w = C.ldlt().solve(VectorXd::Ones(dim));
+		VectorXd w = C.ldlt().solve(VectorXd::Ones(k));
 		double wsum = w.sum();
 		for (UINT j = 0; j < k; j++)
-			outW(i,inNeighbors[i][j]) = w[i]/wsum;
+			outW(i,inNeighbors[i][j]) = w[j]/wsum;
 		// 	sparseWeights.push_back(Tripletd(i, inNeighbors[i][j], w[j]/wsum));
 	}
 	// outW.setFromTriplets(sparseWeights.begin(), sparseWeights.end());
