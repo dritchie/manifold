@@ -1,14 +1,16 @@
 
 CC=clang++
-SO=liblle.so
+SO=libmanifold.so
 
 # CFLAGS=
 CFLAGS=-g
 
 HEADERS=\
+	exports.h \
 	lle.h
 
 CPP=\
+	exports.cpp \
 	lle.cpp
 
 OBJ=$(CPP:.cpp=.o)

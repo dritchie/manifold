@@ -15,7 +15,7 @@ local C = terralib.includecstring [[
 #include <stdlib.h>
 ]]
 
-local lle = terralib.require("lle")
+local manifold = terralib.require("manifoldcpp")
 
 local clamp = macro(function(x, lo, hi)
 	return quote
@@ -48,7 +48,7 @@ local function circleModule()
 		-- err = err*err
 		-- factor(-err/temp)
 
-		-- -- GMM constraint
+		-- GMM constraint
 		var lg1 = [rand.gaussian_logprob(real)](dotPos(0), 0.3, 0.04)
 		var lg2 = [rand.gaussian_logprob(real)](dotPos(0), 0.7, 0.04)
 		var gmm = ad.math.log(0.5*ad.math.exp(lg1) + 0.5*ad.math.exp(lg2))
@@ -59,10 +59,10 @@ local function circleModule()
 end
 
 
-local function stripLogprobsAndDiscard(samps,numToDiscard)
+local function stripLogprobs(samps)
 	local terra strip()
 		var points = [Vector(Vec2d)].stackAlloc()
-		for i=numToDiscard,samps.size do
+		for i=0,samps.size do
 			points:push(samps(i).value)
 		end
 		return points
@@ -84,7 +84,7 @@ local function doLLE(pointSamps)
 				inDataP[d] = pointSamps(i)(d)
 			end
 		end
-		var outData = lle.LLE(inDim, outDim, numPoints, k, inData)
+		var outData = manifold.LLE(inDim, outDim, numPoints, k, inData)
 		var outVector = [Vector(double)].stackAlloc(numPoints, 0.0)
 		for i=0,numPoints do
 			outVector(i) = outData[i]
@@ -155,7 +155,7 @@ local terra doInference()
 end
 local samples = m.gc(doInference())
 
-local points = stripLogprobsAndDiscard(samples, burnin)
+local points = stripLogprobs(samples)
 
 -- local embeddedPoints = doLLE(points)
 -- -- Sort points so we can see how the embedding did

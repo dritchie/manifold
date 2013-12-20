@@ -5,10 +5,10 @@ local dir = sourcefile:gsub("init.t", "")
 
 util.wait(string.format("cd %s; make", dir))
 
-local header = sourcefile:gsub("init.t", "lle.h")
-local LLE = terralib.includec(header)
+local header = sourcefile:gsub("init.t", "exports.h")
+local mod = terralib.includec(header)
 
-local lib = sourcefile:gsub("init.t", "liblle.so")
+local lib = sourcefile:gsub("init.t", "libmanifold.so")
 terralib.linklibrary(lib)
 
-return LLE
+return mod

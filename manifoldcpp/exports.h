@@ -1,5 +1,5 @@
-#ifndef _LLE__H
-#define _LLE__H
+#ifndef _MANIFOLD__H
+#define _MANIFOLD__H
 
 #ifdef _WIN32
 #define EXPORT __declspec(dllexport)
