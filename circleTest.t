@@ -5,6 +5,8 @@ local Vec = terralib.require("linalg").Vec
 local image = terralib.require("image")
 local m = terralib.require("mem")
 local util = terralib.require("util")
+local rand = terralib.require("prob.random")
+local ad = terralib.require("ad")
 
 local Vec2d = Vec(double, 2)
 
@@ -37,22 +39,20 @@ local function circleModule()
 		-- Prior
 		-- var dotPos = Vec2.stackAlloc(ngaussian(0.5, 0.25), ngaussian(0.5, 0.01))
 		-- var dotPos = Vec2.stackAlloc(ngaussian(0.5, 0.01), ngaussian(0.5, 0.25))
-		var dotPos = Vec2.stackAlloc(ngaussian(0.5, 0.2), ngaussian(0.5, 0.2))
+		var dotPos = Vec2.stackAlloc(ngaussian(0.5, 0.25), ngaussian(0.5, 0.25))
 
-		-- Circle constraint
-		var circCenter = Vec2.stackAlloc(0.5, 0.5)
-		var distToCenter = dotPos:dist(circCenter)
-		var err = distToCenter - radius
-		err = err*err
-		factor(-err/temp)
+		-- -- Circle constraint
+		-- var circCenter = Vec2.stackAlloc(0.5, 0.5)
+		-- var distToCenter = dotPos:dist(circCenter)
+		-- var err = distToCenter - radius
+		-- err = err*err
+		-- factor(-err/temp)
 
-		-- Angle constraint
-		-- var offset = (dotPos - circCenter)
-		-- offset:normalize()
-		-- var d = offset:dot(Vec2.stackAlloc(0.0, 1.0))
-		-- var derr = 1.0-d
-		-- derr = derr*derr/angleWeakenFactor
-		-- factor(-derr/temp)
+		-- -- GMM constraint
+		var lg1 = [rand.gaussian_logprob(real)](dotPos(0), 0.3, 0.04)
+		var lg2 = [rand.gaussian_logprob(real)](dotPos(0), 0.7, 0.04)
+		var gmm = ad.math.log(0.5*ad.math.exp(lg1) + 0.5*ad.math.exp(lg2))
+		factor(gmm)
 
 		return dotPos
 	end
@@ -145,10 +145,10 @@ end
 
 ---------------------------------------------
 
-local numsamps = 1000
+local numsamps = 2000
 local burnin = 100
 numsamps = numsamps + burnin
-local kernel = HMC({numSteps=10, targetAcceptRate=0.65})
+local kernel = HMC({numSteps=20, targetAcceptRate=0.65})
 local terra doInference()
 	return [mcmc(circleModule, kernel, {numsamps=numsamps, verbose=true, burnin=burnin})]
 	-- return [forwardSample(circleModule, numsamps)]
@@ -156,36 +156,36 @@ end
 local samples = m.gc(doInference())
 
 local points = stripLogprobsAndDiscard(samples, burnin)
-local embeddedPoints = doLLE(points)
 
--- Sort points so we can see how the embedding did
-local struct PointWithEmbedding
-{
-	point: Vec2d,
-	embedding: double
-}
-local terra comparePoints(p1: &opaque, p2: &opaque)
-	var p1v = [&PointWithEmbedding](p1)
-	var p2v = [&PointWithEmbedding](p2)
-	if p1v.embedding < p2v.embedding then
-		return -1
-	elseif p1v.embedding == p2v.embedding then
-		return 0
-	else
-		return 1
-	end
-end
-local sortedPoints = terralib.new(PointWithEmbedding[embeddedPoints.size])
-for i=0,embeddedPoints.size-1 do
-	local pwe = terralib.new(PointWithEmbedding)
-	pwe.point = points:get(i)
-	pwe.embedding = embeddedPoints:get(i)
-	sortedPoints[i] = pwe
-end
-C.qsort(sortedPoints, points.size, terralib.sizeof(PointWithEmbedding), comparePoints:getpointer())
-for i=0,points.size do
-	points:set(i, sortedPoints[i].point)
-end
+-- local embeddedPoints = doLLE(points)
+-- -- Sort points so we can see how the embedding did
+-- local struct PointWithEmbedding
+-- {
+-- 	point: Vec2d,
+-- 	embedding: double
+-- }
+-- local terra comparePoints(p1: &opaque, p2: &opaque)
+-- 	var p1v = [&PointWithEmbedding](p1)
+-- 	var p2v = [&PointWithEmbedding](p2)
+-- 	if p1v.embedding < p2v.embedding then
+-- 		return -1
+-- 	elseif p1v.embedding == p2v.embedding then
+-- 		return 0
+-- 	else
+-- 		return 1
+-- 	end
+-- end
+-- local sortedPoints = terralib.new(PointWithEmbedding[embeddedPoints.size])
+-- for i=0,embeddedPoints.size-1 do
+-- 	local pwe = terralib.new(PointWithEmbedding)
+-- 	pwe.point = points:get(i)
+-- 	pwe.embedding = embeddedPoints:get(i)
+-- 	sortedPoints[i] = pwe
+-- end
+-- C.qsort(sortedPoints, points.size, terralib.sizeof(PointWithEmbedding), comparePoints:getpointer())
+-- for i=0,points.size do
+-- 	points:set(i, sortedPoints[i].point)
+-- end
 
 renderVideo(points)
 
