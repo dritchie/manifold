@@ -1,8 +1,5 @@
 #include "lle.h"
-#include "stddef.h"
 #include <vector>
-#include <cstdlib>
-#include <iostream>
 
 // Unfortunately, Eigen *still* does not provide sparse eigenvalue solvers...
 //    so we're doing everything dense for now.
@@ -25,12 +22,11 @@ typedef vector< vector<int> > NeighborList;
 void computeNeighbors(int k, const MatrixXd& inData, NeighborList& outNeighbors)
 {
 	// For now, just brute force KNN
+	outNeighbors.resize(inData.cols());
 	KNNBruteForce knn(inData);
-	vector<int> ns;
 	for (UINT i = 0; i < inData.cols(); i++)
 	{
-		knn.kNearest(k, i, ns);
-		outNeighbors.push_back(ns);
+		knn.kNearest(k, i, outNeighbors[i]);
 	}
 }
 

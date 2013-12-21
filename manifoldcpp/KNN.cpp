@@ -40,7 +40,7 @@ void KNNBruteForce::kNearest(int k, const Eigen::VectorXd& point, NeighborList& 
 
 void KNNBruteForce::kNearest(int k, int whichPoint, NeighborList& ns)
 {
-	const VectorXd& point = points[k];
+	const VectorXd& point = points[whichPoint];
 	// Get k+1 neighbors and remove the first, which will be the point itself
 	kNearest(k+1, point, ns);
 	ns.erase(ns.begin());
