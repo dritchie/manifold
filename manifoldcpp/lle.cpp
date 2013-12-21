@@ -11,48 +11,26 @@
 // #include "Eigen/SparseCore"
 #include "Eigen/Eigenvalues"
 
+#include "KNN.h"
+
 using namespace std;
 using namespace Eigen;
 
 typedef unsigned int UINT;
-// typedef SparseMatrix<double> SparseMatrixd;
 typedef vector< vector<int> > NeighborList;
+// typedef SparseMatrix<double> SparseMatrixd;
 // typedef Triplet<double> Tripletd;
 
-class NeighborWithDist
-{
-public:
-	int index;
-	double dist;
-	NeighborWithDist() {}
-	NeighborWithDist(int i, double d) : index(i), dist(d) {}
-	inline bool operator < (const NeighborWithDist& other) const
-	{
-		return this->dist < other.dist;
-	}
-};
 
 void computeNeighbors(int k, const MatrixXd& inData, NeighborList& outNeighbors)
 {
 	// For now, just brute force KNN
-
-	outNeighbors.resize(inData.cols());
-	vector<NeighborWithDist> neighborDists(inData.cols()-1);
+	KNNBruteForce knn(inData);
+	vector<int> ns;
 	for (UINT i = 0; i < inData.cols(); i++)
 	{
-		int currIndex = 0;
-		for (UINT j = 0; j < inData.cols(); j++)
-		{
-			if (i != j)
-			{
-				double distSq = (inData.col(i) - inData.col(j)).squaredNorm();
-				neighborDists[currIndex] = NeighborWithDist(j, distSq);
-				currIndex++;
-			}
-		}
-		sort(neighborDists.begin(), neighborDists.end());
-		for (int j = 0; j < k; j++)
-			outNeighbors[i].push_back(neighborDists[j].index);
+		knn.kNearest(k, i, ns);
+		outNeighbors.push_back(ns);
 	}
 }
 
