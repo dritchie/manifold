@@ -2,10 +2,12 @@
 #define _GRAPH__H
 
 #include <vector>
+#include <tr1/unordered_set>
 
 class Graph
 {
 public:
+	typedef std::tr1::unordered_set<int> NodeSet;
 	typedef std::vector<int> NodeList;
 	Graph(int numNodes);
 	void addNeighbor(int node, int neighbor);
@@ -19,10 +21,10 @@ public:
 	// Only valid for undirected graphs.
 	void connectedComponents(std::vector<NodeList>& comps);
 
-	// // Make a graph undirected
-	// void symmetrize()
+	// Make a graph undirected
+	void symmetrize();
 
-	std::vector<NodeList> neighbors;
+	std::vector<NodeSet> neighbors;
 };
 
 

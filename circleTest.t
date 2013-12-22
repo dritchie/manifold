@@ -161,7 +161,7 @@ local sort1DwithLLE_multiIsland = templatize(function(VecType)
 					pointsForThisIsland:push(points(i))
 				end
 			end
-			C.printf("pointsForThisIsland.size: %d\n", pointsForThisIsland.size)
+			C.printf("island %d size: %d\n", c+1, pointsForThisIsland.size)
 			var data = [pointsToCdata(VecType)](pointsForThisIsland)
 			pointsForThisIsland = [sort1DwithLLE(VecType)](pointsForThisIsland, k)
 			C.free(data)

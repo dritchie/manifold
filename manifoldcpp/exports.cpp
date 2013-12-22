@@ -57,6 +57,7 @@ extern "C"
 		KNNBruteForce knn(data);
 		Graph g(numPoints);
 		knn.buildGraph(k, g);
+		g.symmetrize();
 		vector<Graph::NodeList> comps;
 		g.connectedComponents(comps);
 

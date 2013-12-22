@@ -11,13 +11,13 @@ Graph::Graph(int numNodes)
 
 void Graph::addNeighbor(int node, int neighbor)
 {
-	neighbors[node].push_back(neighbor);
+	neighbors[node].insert(neighbor);
 }
 
 void Graph::addNeighbors(int node, const NodeList& neighbors)
 {
-	NodeList& nlist = this->neighbors[node];
-	nlist.insert(nlist.end(), neighbors.begin(), neighbors.end());
+	NodeSet& nset = this->neighbors[node];
+	nset.insert(neighbors.begin(), neighbors.end());
 }
 
 template<class T>
@@ -38,13 +38,14 @@ void Graph::Traverse(int startNode, NodeList& reached)
 		int node = first(fringe);
 		fringe.pop();
 		reached.push_back(node);
-		const NodeList& ns = neighbors[node];
-		for (size_t i = 0; i < ns.size(); i++)
+		const NodeSet& ns = neighbors[node];
+		for (NodeSet::const_iterator it = ns.begin(); it != ns.end(); it++)
 		{
-			if (!visited[ns[i]])
+			int j = *it;
+			if (!visited[j])
 			{
-				visited[ns[i]] = true;
-				fringe.push(ns[i]);
+				visited[j] = true;
+				fringe.push(j);
 			}
 		}
 	}
@@ -60,18 +61,18 @@ void Graph::DFS(int startNode, NodeList& reached)
 	Traverse< stack<int> >(startNode, reached);
 }
 
-// void Graph::symmetrize()
-// {
-// 	for (size_t i = 0; i < neighbors.size(); i++)
-// 	{
-// 		const NodeList& ns = neighbors[i];
-// 		for (size_t ni = 0; ni < ns.size(); ni++)
-// 		{
-// 			int j = ns[ni];
-// 			// neighbors[j]
-// 		}
-// 	}
-// }
+void Graph::symmetrize()
+{
+	for (size_t i = 0; i < neighbors.size(); i++)
+	{
+		const NodeSet& ns = neighbors[i];
+		for (NodeSet::const_iterator it = ns.begin(); it != ns.end(); it++)
+		{
+			int j = *it;
+			neighbors[j].insert(i);
+		}
+	}
+}
 
 void Graph::connectedComponents(std::vector<NodeList>& comps)
 {
