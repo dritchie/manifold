@@ -7,6 +7,8 @@ local m = terralib.require("mem")
 local util = terralib.require("util")
 local rand = terralib.require("prob.random")
 local ad = terralib.require("ad")
+local templatize = terralib.require("templatize")
+local ffi = require("ffi")
 
 local Vec2d = Vec(double, 2)
 
@@ -59,7 +61,7 @@ local function circleModule()
 end
 
 
-local function stripLogprobs(samps)
+local function stripLogprobsAndVectorize(samps)
 	local terra strip()
 		var points = [Vector(Vec2d)].stackAlloc()
 		for i=0,samps.size do
@@ -70,30 +72,108 @@ local function stripLogprobs(samps)
 	return m.gc(strip())
 end
 
-local function doLLE(pointSamps)
-	print("Doing LLE...")
-	local inDim = 2
-	local outDim = 1
-	local numPoints = pointSamps.size
-	local k = 20
-	local terra dolle()
-		var inData = [&double](C.malloc(numPoints*inDim*sizeof(double)))
-		for i=0,numPoints do
-			var inDataP = inData + i*inDim
-			for d=0,inDim do
-				inDataP[d] = pointSamps(i)(d)
+local function vectorType(points)
+	return terralib.typeof(points:get(0))
+end
+
+local pointsToCdata = templatize(function(VecType)
+	local dim = VecType.Dimension
+	return terra(points: Vector(VecType))
+		var data = [&double](C.malloc(points.size*dim*sizeof(double)))
+		for i=0,points.size do
+			var inDataP = data + i*dim
+			for d=0,dim do
+				inDataP[d] = points(i)(d)
 			end
 		end
+		return data
+	end
+end)
+
+local doLLE = templatize(function(VecType)
+	local inDim = VecType.Dimension
+	return terra(pointSamps: Vector(VecType), outDim: int, k: int)
+		C.printf("Doing LLE...\n")
+		var numPoints = pointSamps.size
+		var inData = [pointsToCdata(VecType)](pointSamps)
 		var outData = manifold.LLE(inDim, outDim, numPoints, k, inData)
 		var outVector = [Vector(double)].stackAlloc(numPoints, 0.0)
 		for i=0,numPoints do
 			outVector(i) = outData[i]
 		end
+		C.free(inData)
 		C.free(outData)
 		return outVector
 	end
-	return m.gc(dolle())
-end
+end)
+
+local sort1DwithLLE = templatize(function(VecType)
+	-- Sort points so we can see how the embedding did
+	local struct PointWithEmbedding
+	{
+		point: VecType,
+		embedding: double
+	}
+	local terra comparePoints(p1: &opaque, p2: &opaque)
+		var p1v = [&PointWithEmbedding](p1)
+		var p2v = [&PointWithEmbedding](p2)
+		if p1v.embedding < p2v.embedding then
+			return -1
+		elseif p1v.embedding == p2v.embedding then
+			return 0
+		else
+			return 1
+		end
+	end
+	return terra(points: Vector(VecType), k: int)
+		var embeddedPoints = [doLLE(VecType)](points, 1, k)
+		var sortedPoints = [&PointWithEmbedding](C.malloc(embeddedPoints.size*sizeof(PointWithEmbedding)))
+		for i=0,embeddedPoints.size do
+			var pwe : PointWithEmbedding
+			pwe.point = points(i)
+			pwe.embedding = embeddedPoints(i)
+			sortedPoints[i] = pwe
+		end
+		C.qsort(sortedPoints, points.size, sizeof(PointWithEmbedding), comparePoints)
+		var outPoints = [Vector(VecType)].stackAlloc()
+		for i=0,points.size do
+			outPoints:push(sortedPoints[i].point)
+		end
+		C.free(sortedPoints)
+		return outPoints
+	end
+end)
+
+local sort1DwithLLE_multiIsland = templatize(function(VecType)
+	local dim = VecType.Dimension
+	return terra(points: Vector(VecType), k: int)
+		C.printf("Finding islands...\n")
+		var inData = [pointsToCdata(VecType)](points)
+		var assignments : &int
+		var numIslands = manifold.findIslands(dim, points.size, k, inData, &assignments)
+		C.printf("numIslands = %d\n", numIslands)
+		C.free(inData)
+		var outPoints = [Vector(VecType)].stackAlloc()
+		for c=0,numIslands do
+			var pointsForThisIsland = [Vector(VecType)].stackAlloc()
+			for i=0,points.size do
+				if assignments[i] == c then
+					pointsForThisIsland:push(points(i))
+				end
+			end
+			C.printf("pointsForThisIsland.size: %d\n", pointsForThisIsland.size)
+			var data = [pointsToCdata(VecType)](pointsForThisIsland)
+			pointsForThisIsland = [sort1DwithLLE(VecType)](pointsForThisIsland, k)
+			C.free(data)
+			for i=0,pointsForThisIsland.size do
+				outPoints:push(pointsForThisIsland(i))
+			end
+			m.destruct(pointsForThisIsland)
+		end
+		C.free(assignments)
+		return outPoints
+	end
+end)
 
 local function renderVideo(pointSamps)
 	local dotRadius = 0.05
@@ -154,42 +234,15 @@ local terra doInference()
 	-- return [forwardSample(circleModule, numsamps)]
 end
 local samples = m.gc(doInference())
+local points = stripLogprobsAndVectorize(samples)
+local VecType = vectorType(points)
 
-local points = stripLogprobs(samples)
-
--- local embeddedPoints = doLLE(points)
--- -- Sort points so we can see how the embedding did
--- local struct PointWithEmbedding
--- {
--- 	point: Vec2d,
--- 	embedding: double
--- }
--- local terra comparePoints(p1: &opaque, p2: &opaque)
--- 	var p1v = [&PointWithEmbedding](p1)
--- 	var p2v = [&PointWithEmbedding](p2)
--- 	if p1v.embedding < p2v.embedding then
--- 		return -1
--- 	elseif p1v.embedding == p2v.embedding then
--- 		return 0
--- 	else
--- 		return 1
--- 	end
--- end
--- local sortedPoints = terralib.new(PointWithEmbedding[embeddedPoints.size])
--- for i=0,embeddedPoints.size-1 do
--- 	local pwe = terralib.new(PointWithEmbedding)
--- 	pwe.point = points:get(i)
--- 	pwe.embedding = embeddedPoints:get(i)
--- 	sortedPoints[i] = pwe
--- end
--- C.qsort(sortedPoints, points.size, terralib.sizeof(PointWithEmbedding), comparePoints:getpointer())
--- for i=0,points.size do
--- 	points:set(i, sortedPoints[i].point)
--- end
+local k = 20
+-- points = (sort1DwithLLE(VecType))(points, k)
+points = (sort1DwithLLE_multiIsland(VecType))(points, k)
+m.gc(points)
 
 renderVideo(points)
-
-
 
 
 

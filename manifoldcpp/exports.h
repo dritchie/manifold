@@ -14,6 +14,9 @@ EXTERN
 
 EXPORT double* LLE(int inDim, int outDim, int numPoints, int k, double* data);
 
+// Returns the number of islands (i.e. connected components)
+EXPORT int findIslands(int dim, int numPoints, int k, double* inData, int** outAssignments);
+
 #ifdef __cplusplus
 }
 #endif

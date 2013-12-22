@@ -1,5 +1,6 @@
 #include "Graph.h"
 #include <queue>
+#include <stack>
 
 using namespace std;
 
@@ -19,34 +20,67 @@ void Graph::addNeighbors(int node, const NodeList& neighbors)
 	nlist.insert(nlist.end(), neighbors.begin(), neighbors.end());
 }
 
-void Graph::BFS(int startNode, NodeList& reached)
+template<class T>
+T first(const stack<T>& s) { return s.top(); }
+
+template<class T>
+T first(const queue<T>& s) { return s.front(); }
+
+template <class FringeType>
+void Graph::Traverse(int startNode, NodeList& reached)
 {
 	vector<bool> visited(neighbors.size(), false);
-	queue<int> fringe;
+	FringeType fringe;
 	fringe.push(startNode);
+	visited[startNode] = true;
 	while (!fringe.empty())
 	{
-		int node = fringe.front();
+		int node = first(fringe);
 		fringe.pop();
-		visited[node] = true;
 		reached.push_back(node);
 		const NodeList& ns = neighbors[node];
 		for (size_t i = 0; i < ns.size(); i++)
 		{
 			if (!visited[ns[i]])
+			{
+				visited[ns[i]] = true;
 				fringe.push(ns[i]);
+			}
 		}
 	}
 }
 
+void Graph::BFS(int startNode, NodeList& reached)
+{
+	Traverse< queue<int> >(startNode, reached);
+}
+
+void Graph::DFS(int startNode, NodeList& reached)
+{
+	Traverse< stack<int> >(startNode, reached);
+}
+
+// void Graph::symmetrize()
+// {
+// 	for (size_t i = 0; i < neighbors.size(); i++)
+// 	{
+// 		const NodeList& ns = neighbors[i];
+// 		for (size_t ni = 0; ni < ns.size(); ni++)
+// 		{
+// 			int j = ns[ni];
+// 			// neighbors[j]
+// 		}
+// 	}
+// }
+
 void Graph::connectedComponents(std::vector<NodeList>& comps)
 {
 	vector<bool> visited(neighbors.size(), false);
-	NodeList ns;
 	for (size_t i = 0; i < neighbors.size(); i++)
 	{
 		if (!visited[i])
 		{
+			NodeList ns;
 			BFS(i, ns);
 			for (size_t j = 0; j < ns.size(); j++)
 				visited[ns[j]] = true;
