@@ -9,6 +9,7 @@
 	{
 		"sublimeclang_options":
 		[
+			"-I${env:C_INCLUDE_PATH}",
 			"-I${folder:${project_path:manifold.sublime-project}}",
 			"-I${folder:${project_path:manifold.sublime-project}}/shared"	
 		]
