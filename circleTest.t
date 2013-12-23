@@ -61,6 +61,29 @@ local function circleModule()
 end
 
 
+local function discardLowestNPercent(samps, thresh)
+	local SampType = terralib.typeof(samps:get(0))
+	local terra compareSamps(s1: &opaque, s2: &opaque)
+		var s1_ = [&SampType](s1)
+		var s2_ = [&SampType](s2)
+		if s1_.logprob > s2_.logprob then
+			return -1
+		elseif s1_.logprob < s2_.logprob then
+			return 1
+		else
+			return 0
+		end
+	end
+	local terra discard()
+		var sortedSamps = m.copy(samps)
+		C.qsort(sortedSamps.__data, samps.size, sizeof(SampType), compareSamps)
+		var newSize = sortedSamps.size * (1.0 - thresh)
+		sortedSamps:resize(newSize)
+		return sortedSamps
+	end
+	return m.gc(discard())
+end
+
 local function stripLogprobsAndVectorize(samps)
 	local terra strip()
 		var points = [Vector(Vec2d)].stackAlloc()
@@ -234,6 +257,9 @@ local terra doInference()
 	-- return [forwardSample(circleModule, numsamps)]
 end
 local samples = m.gc(doInference())
+
+local discardThresh = 0.05	-- discard lowest n% of samples
+samples = discardLowestNPercent(samples, discardThresh)
 local points = stripLogprobsAndVectorize(samples)
 local VecType = vectorType(points)
 
