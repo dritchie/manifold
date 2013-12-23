@@ -7,6 +7,10 @@
 #include <vector>
 #include <fstream>
 #include <tr1/unordered_set>
+#include <limits>
+
+#include "KNN.h"
+#include "lle.h"
 
 using namespace std;
 using namespace std::tr1;
@@ -17,7 +21,17 @@ struct SampleRecord
 	double score;
 	VectorXd colors;
 	FIBITMAP* image;
+	VectorXd embedding;
 };
+
+// GLUT globals and constants
+int windows[2];
+int mapWindowSize = 500;
+int imWindowSize = 200;
+vector<SampleRecord> sampleRecords;
+vector< vector<int> > islands;
+int whichIsland;
+int whichPoint;
 
 void loadSamples(const string& patternIDPath, const unordered_set<double>& whichTemps, vector<SampleRecord>& outSamps)
 {
@@ -59,8 +73,132 @@ void loadSamples(const string& patternIDPath, const unordered_set<double>& which
 	}
 }
 
+void mapManifolds(int k, vector<SampleRecord>& samps, vector< vector<int> >& islands)
+{
+	// Extract data
+	int dim = samps[0].colors.size();
+	MatrixXd data(dim, samps.size());
+	for (size_t i = 0; i < samps.size(); i++)
+		data.col(i) = samps[i].colors;
 
+	// Find islands
+	cout << "Finding islands..." << flush;
+	KNNBruteForce knn(data);
+	Graph g(samps.size());
+	knn.buildGraph(k, g);
+	g.symmetrize();
+	g.connectedComponents(islands);
+	cout << "DONE (" << islands.size() << " found)." << endl;
 
+	// Do embeddings for each island
+	for (size_t i = 0; i < islands.size(); i++)
+	{
+		const vector<int>& island = islands[i];
+		cout << "Computing embedding " << i+1 <<  " (size " << island.size() << ")..." << flush;
+		MatrixXd inData(dim, island.size());
+		for (size_t j = 0; j < island.size(); j++)
+			inData.col(j) = data.col(island[j]);
+		MatrixXd outData;
+		lle(inData, outData, 2, k);
+		for (size_t j = 0; j < island.size(); j++)
+			samps[island[j]].embedding = outData.col(j);
+		cout << "DONE." << endl;
+	}
+}
+
+void fitMapViewToData()
+{
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	double minx = numeric_limits<double>::infinity();
+	double maxx = -numeric_limits<double>::infinity();
+	double miny = numeric_limits<double>::infinity();
+	double maxy = -numeric_limits<double>::infinity();
+	const vector<int>& island = islands[whichIsland];
+	for (size_t i = 0; i < island.size(); i++)
+	{
+		const VectorXd& p = sampleRecords[island[i]].embedding;
+		minx = fmin(p.x(), minx);
+		maxx = fmax(p.x(), maxx);
+		miny = fmin(p.y(), miny);
+		maxy = fmax(p.y(), maxy);
+	}
+	double xrange = fabs(maxx - minx);
+	double yrange = fabs(maxy - miny);
+	minx -= 0.05*xrange;
+	maxx += 0.05*xrange;
+	miny -= 0.05*yrange;
+	maxy += 0.05*yrange;
+	gluOrtho2D(minx, maxx, miny, maxy);
+}
+
+void resizeMap(int w, int h)
+{
+	glViewport(0, 0, w, h);
+	fitMapViewToData();
+}
+
+void displayMap()
+{
+	glPointSize(4.0f);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glBegin(GL_POINTS);
+	
+	const vector<int>& island = islands[whichIsland];
+	glColor3f(1.0f, 1.0f, 1.0f);
+	for (size_t i = 0; i < island.size(); i++)
+	{
+		const VectorXd& p = sampleRecords[island[i]].embedding;
+		glVertex2d(p.x(), p.y());
+	}
+	// Re-render selected point on top of everything else.
+	glColor3f(1.0f, 0.0f, 0.0f);
+	const VectorXd& p = sampleRecords[island[whichPoint]].embedding;
+	glVertex2d(p.x(), p.y());
+
+	glEnd();
+	glutSwapBuffers();
+}
+
+void mouseClickMap(int button, int state, int x, int y)
+{
+	// TODO: select nearest point.
+}
+
+void keyboardMap(unsigned char key, int x, int y)
+{
+	switch (key)
+	{
+		case 'a':
+			whichIsland = whichIsland - 1;
+			if (whichIsland < 0) whichIsland = islands.size() - 1;
+			whichPoint = 0;
+			break;
+		case 'd':
+			whichIsland = (whichIsland + 1) % (islands.size());
+			whichPoint = 0;
+			break;
+		default:
+			break;
+	}
+	fitMapViewToData();
+	glutPostRedisplay();
+	// TODO: Also post redisplay for the other window.
+}
+
+void initManifoldMapWindow()
+{
+	glutInitWindowSize(mapWindowSize, mapWindowSize);
+	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+	windows[0] = glutCreateWindow("Manifold Map");
+	glutDisplayFunc(displayMap);
+	glutReshapeFunc(resizeMap);
+	glutKeyboardFunc(keyboardMap);
+	glutMouseFunc(mouseClickMap);
+}
 
 int main(int argc, char** argv)
 {
@@ -71,11 +209,26 @@ int main(int argc, char** argv)
 	char* patternIDPath = argv[1];
 	unordered_set<double> whichTemps;
 	whichTemps.insert(0.05);
-	vector<SampleRecord> sampleRecords;
 	loadSamples(patternIDPath, whichTemps, sampleRecords);
 	cout << "DONE (" << sampleRecords.size() << " samples loaded)." << endl;
 
 	// Find and project islands
+	int k = 5;
+	mapManifolds(k, sampleRecords, islands);
+	whichIsland = 0;
+	whichPoint = 0;
+
+
+	/**** Set up GLUT and start interaction ****/
+
+	glutInit(&argc, argv);
+
+	// Window 1: Manifold maps
+	initManifoldMapWindow();
+
+	// Window 2: Recolored images
+
+	glutMainLoop();
 
 	FreeImage_DeInitialise();
 	return 0;
