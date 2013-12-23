@@ -17,7 +17,7 @@ local C = terralib.includecstring [[
 #include <stdlib.h>
 ]]
 
-local manifold = terralib.require("manifoldcpp")
+local manifold = terralib.require("terralib")
 
 local clamp = macro(function(x, lo, hi)
 	return quote

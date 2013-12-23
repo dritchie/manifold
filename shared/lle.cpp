@@ -18,7 +18,6 @@ typedef vector< vector<int> > NeighborList;
 // typedef SparseMatrix<double> SparseMatrixd;
 // typedef Triplet<double> Tripletd;
 
-
 void computeNeighbors(int k, const MatrixXd& inData, NeighborList& outNeighbors)
 {
 	// For now, just brute force KNN

@@ -1,0 +1,16 @@
+{
+	"folders":
+	[
+		{
+			"path": "."
+		}
+	],
+	"settings":
+	{
+		"sublimeclang_options":
+		[
+			"-I${folder:${project_path:manifold.sublime-project}}",
+			"-I${folder:${project_path:manifold.sublime-project}}/shared"	
+		]
+	}
+}

@@ -3,19 +3,19 @@ CC=clang++
 SO=libmanifold.so
 
 # CFLAGS=
-CFLAGS=-g
+CFLAGS=-g -I.. -I../shared
 
 HEADERS=\
 	exports.h \
-	Graph.h \
-	KNN.h \
-	lle.h
+	../shared/Graph.h \
+	../shared/KNN.h \
+	../shared/lle.h
 
 CPP=\
 	exports.cpp \
-	Graph.cpp \
-	KNN.cpp \
-	lle.cpp
+	../shared/Graph.cpp \
+	../shared/KNN.cpp \
+	../shared/lle.cpp
 
 OBJ=$(CPP:.cpp=.o)
 
