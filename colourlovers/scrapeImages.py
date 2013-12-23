@@ -15,7 +15,11 @@ def go(filename):
 		if rowsdone > 0:
 			imageurl = row[5]
 			sampid = row[0]
-			imagefilename = os.path.join(path, sampid + ".png")
+			temp = row[1]
+			tempdir = os.path.join(path, temp)
+			if not os.path.exists(tempdir):
+				os.mkdir(tempdir)
+			imagefilename = os.path.join(tempdir, sampid + ".png")
 			cmd = "curl {0} -o {1}".format(imageurl, imagefilename)
 			print cmd
 			subprocess.call(cmd, shell=True)
