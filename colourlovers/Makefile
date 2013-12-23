@@ -1,6 +1,6 @@
 
 CC=clang++
-EXE=colourlovers
+EXE=app
 
 CFLAGS=-g -I.. -I../shared
 LDFLAGS=-framework OpenGL -framework GLUT -lfreeimage
