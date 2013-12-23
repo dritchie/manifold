@@ -1,4 +1,5 @@
 renders
 colourlovers/data
+colourlovers/app
 *.o
 *.sublime-workspace
