@@ -11,6 +11,16 @@ KNNBruteForce::KNNBruteForce(const Eigen::MatrixXd& points)
 		this->points[i] = points.col(i);
 }
 
+void KNNBruteForce::addPoint(const Eigen::MatrixXd& p)
+{
+	points.push_back(p);
+}
+
+void KNNBruteForce::clear()
+{
+	points.clear();
+}
+
 class NeighborWithDist
 {
 public:

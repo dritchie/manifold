@@ -32,6 +32,8 @@ vector<SampleRecord> sampleRecords;
 vector< vector<int> > islands;
 int whichIsland;
 int whichPoint;
+double minx, maxx, miny, maxy;
+KNNBruteForce mapKNN;
 
 void loadSamples(const string& patternIDPath, const unordered_set<double>& whichTemps, vector<SampleRecord>& outSamps)
 {
@@ -106,14 +108,39 @@ void mapManifolds(int k, vector<SampleRecord>& samps, vector< vector<int> >& isl
 	}
 }
 
+/////////////////////////////////////////////
+
+void postRedisplayBothWindows()
+{
+	int currWindow = glutGetWindow();
+	glutSetWindow(windows[0]);
+	glutPostRedisplay();
+	glutSetWindow(windows[1]);
+	glutPostRedisplay();
+	glutSetWindow(currWindow);
+}
+
+/////////////////////////////////////////////
+
+void rebuildMapKNN()
+{
+	mapKNN.clear();
+	const vector<int>& island = islands[whichIsland];
+	for (size_t i = 0; i < island.size(); i++)
+	{
+		const VectorXd& p = sampleRecords[island[i]].embedding;
+		mapKNN.addPoint(p);
+	}
+}
+
 void fitMapViewToData()
 {
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	double minx = numeric_limits<double>::infinity();
-	double maxx = -numeric_limits<double>::infinity();
-	double miny = numeric_limits<double>::infinity();
-	double maxy = -numeric_limits<double>::infinity();
+	minx = numeric_limits<double>::infinity();
+	maxx = -numeric_limits<double>::infinity();
+	miny = numeric_limits<double>::infinity();
+	maxy = -numeric_limits<double>::infinity();
 	const vector<int>& island = islands[whichIsland];
 	for (size_t i = 0; i < island.size(); i++)
 	{
@@ -136,6 +163,7 @@ void resizeMap(int w, int h)
 {
 	glViewport(0, 0, w, h);
 	fitMapViewToData();
+	rebuildMapKNN();
 }
 
 void displayMap()
@@ -165,7 +193,18 @@ void displayMap()
 
 void mouseClickMap(int button, int state, int x, int y)
 {
-	// TODO: select nearest point.
+	double xt = (double)x/mapWindowSize;
+	double yt = (double)y/mapWindowSize;
+	yt = 1 - yt;	// invert y
+	double px = (1-xt)*minx + xt*maxx;
+	double py = (1-yt)*miny + yt*maxy;
+	VectorXd p(2); p.x() = px; p.y() = py;
+	vector<int> nearest;
+	mapKNN.kNearest(1, p, nearest);
+	whichPoint = nearest[0];
+
+	// glutPostRedisplay();
+	postRedisplayBothWindows();
 }
 
 void keyboardMap(unsigned char key, int x, int y)
@@ -185,8 +224,9 @@ void keyboardMap(unsigned char key, int x, int y)
 			break;
 	}
 	fitMapViewToData();
-	glutPostRedisplay();
-	// TODO: Also post redisplay for the other window.
+	rebuildMapKNN();
+	// glutPostRedisplay();
+	postRedisplayBothWindows();
 }
 
 void initManifoldMapWindow()
@@ -198,6 +238,34 @@ void initManifoldMapWindow()
 	glutReshapeFunc(resizeMap);
 	glutKeyboardFunc(keyboardMap);
 	glutMouseFunc(mouseClickMap);
+}
+
+/////////////////////////////////////////////
+
+void resizeIm(int w, int h)
+{
+	glViewport(0, 0, w, h);
+	glutPostRedisplay();
+}
+
+void displayIm()
+{
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+	FIBITMAP* image = sampleRecords[islands[whichIsland][whichPoint]].image;
+	unsigned char* bits = FreeImage_GetBits(image);
+	glDrawPixels(imWindowSize, imWindowSize, GL_RGBA, GL_UNSIGNED_BYTE, bits);
+	glutSwapBuffers();
+}
+
+void initImageWindow()
+{
+	glutInitWindowSize(imWindowSize, imWindowSize);
+	glutInitWindowPosition(600, 10);
+	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+	windows[1] = glutCreateWindow("Recoloring Preview");
+	glutDisplayFunc(displayIm);
+	glutReshapeFunc(resizeIm);
 }
 
 int main(int argc, char** argv)
@@ -227,6 +295,7 @@ int main(int argc, char** argv)
 	initManifoldMapWindow();
 
 	// Window 2: Recolored images
+	initImageWindow();
 
 	glutMainLoop();
 
