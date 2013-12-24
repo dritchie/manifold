@@ -92,6 +92,16 @@ void mapManifolds(int k, vector<SampleRecord>& samps, vector< vector<int> >& isl
 	g.connectedComponents(islands);
 	cout << "DONE (" << islands.size() << " found)." << endl;
 
+	// Discard islands that are too small
+	vector< vector<int> > finalIslands;
+	for (size_t i = 0; i < islands.size(); i++)
+	{
+		if (islands[i].size() >= k)
+			finalIslands.push_back(islands[i]);
+	}
+	cout << "Discarded " << (islands.size() - finalIslands.size()) << " islands (Final #: " << finalIslands.size() << ")." << endl;
+	islands = finalIslands;
+
 	// Do embeddings for each island
 	for (size_t i = 0; i < islands.size(); i++)
 	{

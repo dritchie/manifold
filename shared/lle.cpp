@@ -29,14 +29,25 @@ void computeNeighbors(int k, const MatrixXd& inData, NeighborList& outNeighbors)
 	}
 }
 
+void computeNeighbors(double r, const MatrixXd& inData, NeighborList& outNeighbors)
+{
+	// For now, just brute force KNN
+	outNeighbors.resize(inData.cols());
+	KNNBruteForce knn(inData);
+	for (UINT i = 0; i < inData.cols(); i++)
+	{
+		knn.withinRadius(r, i, outNeighbors[i]);
+	}
+}
+
 void computeReconstructionWeights(const MatrixXd& inData, const NeighborList& inNeighbors, MatrixXd& outW)
 {
 	int dim = inData.col(0).size();
-	int k = inNeighbors[0].size();
 	// vector<Tripletd> sparseWeights;
 	outW = MatrixXd::Zero(outW.rows(), outW.cols());
 	for (UINT i = 0; i < inData.cols(); i++)
 	{
+		int k = inNeighbors[i].size();
 		MatrixXd Z(dim,k);
 		const VectorXd& Xi = inData.col(i);
 		for (UINT j = 0; j < k; j++)
@@ -87,6 +98,17 @@ void lle(const MatrixXd& inData, MatrixXd& outData, int outDim, int k)
 	MatrixXd W(numPoints, numPoints);
 	outData.resize(outDim, numPoints);
 	computeNeighbors(k, inData, Ns);
+	computeReconstructionWeights(inData, Ns, W);
+	computeEmbeddingCoords(outDim, W, outData);
+}
+
+void lle(const MatrixXd& inData, MatrixXd& outData, int outDim, double r)
+{
+	int numPoints = inData.cols();
+	NeighborList Ns;
+	MatrixXd W(numPoints, numPoints);
+	outData.resize(outDim, numPoints);
+	computeNeighbors(r, inData, Ns);
 	computeReconstructionWeights(inData, Ns, W);
 	computeEmbeddingCoords(outDim, W, outData);
 }
