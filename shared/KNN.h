@@ -15,9 +15,14 @@ public:
 	KNNBruteForce(const Eigen::MatrixXd& points);
 	void addPoint(const Eigen::MatrixXd& p);
 	void clear();
+
 	void kNearest(int k, const Eigen::VectorXd& point, NeighborList& ns);
 	void kNearest(int k, int whichPoint, NeighborList& ns);
 	void buildGraph(int k, Graph& graph);
+
+	void withinRadius(double r, const Eigen::VectorXd& point, NeighborList& ns);
+	void withinRadius(double r, int whichPoint, NeighborList& ns);
+	void buildGraph(double r, Graph& graph);
 
 	std::vector<Eigen::VectorXd> points;
 };

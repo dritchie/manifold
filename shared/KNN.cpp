@@ -68,6 +68,42 @@ void KNNBruteForce::buildGraph(int k, Graph& graph)
 	}
 }
 
+void KNNBruteForce::withinRadius(double r, const Eigen::VectorXd& point, NeighborList& ns)
+{
+	double rSq = r*r;
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		if ((point - points[i]).squaredNorm() < rSq)
+			ns.push_back(i);
+	}
+}
+
+void KNNBruteForce::withinRadius(double r, int whichPoint, NeighborList& ns)
+{
+	double rSq = r*r;
+	const VectorXd& point = points[whichPoint];
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		if (i != whichPoint && (point - points[i]).squaredNorm() < rSq)
+			ns.push_back(i);
+	}
+}
+
+void KNNBruteForce::buildGraph(double r, Graph& graph)
+{
+	int numNodes = (int)points.size();
+	graph = Graph(numNodes);
+	NeighborList ns;
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		withinRadius(r, i, ns);
+		graph.addNeighbors(i, ns);
+	}
+}
+
+
+
+
 
 
 

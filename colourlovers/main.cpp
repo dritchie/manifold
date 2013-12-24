@@ -281,7 +281,7 @@ int main(int argc, char** argv)
 	cout << "DONE (" << sampleRecords.size() << " samples loaded)." << endl;
 
 	// Find and project islands
-	int k = 5;
+	int k = 10;
 	mapManifolds(k, sampleRecords, islands);
 	whichIsland = 0;
 	whichPoint = 0;
