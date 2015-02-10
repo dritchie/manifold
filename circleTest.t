@@ -1,13 +1,13 @@
-terralib.require("prob")
+require("prob")
 
-local Vector = terralib.require("vector")
-local Vec = terralib.require("linalg").Vec
-local image = terralib.require("image")
-local m = terralib.require("mem")
-local util = terralib.require("util")
-local rand = terralib.require("prob.random")
-local ad = terralib.require("ad")
-local templatize = terralib.require("templatize")
+local Vector = require("vector")
+local Vec = require("linalg").Vec
+local image = require("image")
+local m = require("mem")
+local util = require("util")
+local rand = require("prob.random")
+local ad = require("ad")
+local templatize = require("templatize")
 local ffi = require("ffi")
 
 local Vec2d = Vec(double, 2)
@@ -17,7 +17,7 @@ local C = terralib.includecstring [[
 #include <stdlib.h>
 ]]
 
-local manifold = terralib.require("terralib")
+local manifold = require("terralib")
 
 local clamp = macro(function(x, lo, hi)
 	return quote
